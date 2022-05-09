@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"database/sql"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -76,6 +77,7 @@ type config struct {
 	parsedHostKeys []ssh.Signer
 	sshConfig      *ssh.ServerConfig
 	logFileHandle  io.WriteCloser
+	db             *sql.DB
 }
 
 func (cfg *config) setDefaults() {
@@ -236,10 +238,15 @@ func (cfg *config) setupLogging() error {
 	return nil
 }
 
-func (cfg *config) load(configString string, dataDir string) error {
+func (cfg *config) load(configString string, dataDir string, dbFile string) error {
 	*cfg = config{}
 
 	cfg.setDefaults()
+
+	if dbFile != "" {
+		cfg.db = InitDB(dbFile)
+  	CreateTableLogins(cfg.db)
+	}
 
 	if err := yaml.UnmarshalStrict([]byte(configString), cfg); err != nil {
 		return err
