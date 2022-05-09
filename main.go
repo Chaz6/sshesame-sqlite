@@ -29,9 +29,11 @@ func init() {
 func main() {
 	configFile := flag.String("config", "", "optional config file")
 	dataDir := flag.String("data_dir", path.Join(xdg.DataHome, "sshesame"), "data directory to store automatically generated host keys in")
+	dbFile := flag.String("db", "", "path to sqlite database")
 	flag.Parse()
 
 	cfg := &config{}
+
 	configString := ""
 	if *configFile != "" {
 		configBytes, err := os.ReadFile(*configFile)
@@ -40,11 +42,14 @@ func main() {
 		}
 		configString = string(configBytes)
 	}
-	err := cfg.load(configString, *dataDir)
+	err := cfg.load(configString, *dataDir, *dbFile)
 	if err != nil {
 		errorLogger.Fatalf("Failed to load config: %v", err)
 	}
 	reloadSignals := make(chan os.Signal, 1)
+	if cfg.db != nil {
+		defer cfg.db.Close()
+	}
 	defer close(reloadSignals)
 	go func() {
 		for signal := range reloadSignals {
@@ -54,7 +59,7 @@ func main() {
 				warningLogger.Printf("Failed to read config file: %v", err)
 			}
 			configString = string(configBytes)
-			err = cfg.load(configString, *dataDir)
+			err = cfg.load(configString, *dataDir, *dbFile)
 			if err != nil {
 				warningLogger.Printf("Failed to reload config: %v", err)
 			}
